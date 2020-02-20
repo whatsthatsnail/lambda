@@ -1,7 +1,12 @@
 # Pure lambda caclulus:
 
-expr    = var
-        | "\\" var "." expr
-        | "(" expr expr ")" ;
+term = application
+     | LAMBDA IDENTIFIER "." term
 
-var     = IDENTIFIER
+application = atom application^
+
+application^ = atom application^
+            | #Empty
+
+atom = "(" term ")"
+     | IDENTIFIER

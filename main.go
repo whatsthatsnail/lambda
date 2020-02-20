@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"lambda/lexer"
+	"lambda/parser"
 	"os"
 )
 
@@ -67,4 +68,9 @@ func file(path string, quiet bool) {
 	tokens, _ := lex.ScanTokens()
 
 	lexer.PrintTokens(tokens)
+
+	parser := parser.NewParser(tokens)
+	tree, _ := parser.Parse()
+
+	fmt.Println(tree)
 }

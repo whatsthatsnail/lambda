@@ -17,7 +17,7 @@ type TokenType int
 
 const (
 	// Single-character
-	BACKSLASH TokenType = iota
+	LAMBDA TokenType = iota
 	DOT
 	LEFT_PAREN
 	RIGHT_PAREN
@@ -32,7 +32,7 @@ const (
 func (t TokenType) typeString() string {
 	switch t {
 	case 0:
-		return "BACKSLASH"
+		return "LAMBDA"
 	case 1:
 		return "DOT"
 	case 2:
@@ -153,7 +153,7 @@ func (l *lexer) scanToken() {
 
 	// Single-character tokens
 	case '\\':
-		l.addToken(BACKSLASH, nil)
+		l.addToken(LAMBDA, nil)
 	case '.':
 		l.addToken(DOT, nil)
 	case '(':
