@@ -1,0 +1,7 @@
+# Pure lambda caclulus:
+
+expr    = var
+        | "\\" var "." expr
+        | "(" expr expr ")" ;
+
+var     = IDENTIFIER
