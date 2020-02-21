@@ -9,9 +9,11 @@ import (
 // ---------- Parser type: ---------- //
 
 type parser struct {
-	tokens  []lexer.Token
-	current int
-	errFlag bool
+	tokens      []lexer.Token
+	context     []string
+	lambdaDepth int
+	current     int
+	errFlag     bool
 }
 
 // Parser constructor, initializes default vaules
@@ -23,7 +25,90 @@ func NewParser(tokens []lexer.Token) parser {
 	return p
 }
 
-//// Helper methods:
+// ---------- Node creator methods: ---------- //
+
+func (p *parser) Parse() (ast.Term, bool) {
+	ast, err := p.term(), p.errFlag
+
+	for k, v := range p.context {
+		fmt.Printf("%v: %s\n", k, v)
+	}
+
+	return ast, err
+}
+
+func (p *parser) term() ast.Term {
+	if p.peek().TType == lexer.LAMBDA {
+		p.advance()
+
+		// Increment lambda depth when beginning a new function.
+		// This is used later for free variable indexes.
+		p.lambdaDepth++
+
+		// Creating a new identifier places it at the end of the context stack.
+		param := p.advance().Lexeme
+
+		// Push the identifier onto the context stack.
+		p.context = append(p.context, param)
+
+		p.consume(lexer.DOT, "Expect '.' after function parameter.")
+		body := p.term()
+
+		// Reset depth.
+		p.lambdaDepth = 0
+
+		// Return the abstraction.
+		return ast.Abstraction{param, body}
+	}
+
+	return p.application()
+}
+
+func (p *parser) application() ast.Term {
+	left, _ := p.atom()
+
+	right, ok := p.atom()
+	for ok {
+		left = ast.Application{left, right}
+		right, ok = p.atom()
+	}
+
+	return left
+}
+
+func (p *parser) atom() (ast.Term, bool) {
+	if p.peek().TType == lexer.LEFT_PAREN {
+		p.advance()
+		term := p.term()
+		p.consume(lexer.RIGHT_PAREN, "Expect closing ')' after term.")
+		return term, true
+	} else if p.peek().TType == lexer.IDENTIFIER {
+
+		// Lookup the identifier in the context stack. Attach it's De Bruijn index to the object.
+		index, ok := contextIndex(p.peek(), p.context)
+
+		if ok {
+			// Attach the identifier's distance from it's declaration in the context stack
+			term := ast.Identifier{p.advance(), len(p.context) - index}
+			return term, true
+		} else {
+			// If it's not in the context stack, it's a free variables.
+			// Free variables wrapped in n lambdas are given index n (using p.lamdaDepth)
+			term := ast.Identifier{p.advance(), p.lambdaDepth}
+
+			//TODO: Is this necessary?
+			// Free variables need to be pushed to the context stack?
+			p.context = append(p.context, term.Id.Lexeme)
+
+			return term, true
+		}
+
+	}
+
+	return ast.Abstraction{}, false
+}
+
+// ---------- Helper methods: ---------- //
 // Return current token without advancing.
 func (p *parser) peek() lexer.Token {
 	return p.tokens[p.current]
@@ -58,6 +143,7 @@ func (p *parser) check(tType lexer.TokenType) bool {
 	}
 }
 
+// Advance over a specified token type. Throw an error if the actual token doesn't match.
 func (p *parser) consume(tType lexer.TokenType, message string) {
 	if p.check(tType) {
 		p.advance()
@@ -66,52 +152,19 @@ func (p *parser) consume(tType lexer.TokenType, message string) {
 	}
 }
 
+// Print an error message at the current line.
 func (p *parser) parseError(token lexer.Token, message string) {
 	p.errFlag = true
-	fmt.Printf("[Line: %v] %s\n", token.Line, message)
+	fmt.Printf("[Line: %v] %s\n", token.Line, fmt.Sprintf("%v -- %s", p.peek().Lexeme, message))
 }
 
-//// Node creator methods:
-
-func (p *parser) Parse() (ast.Term, bool) {
-	return p.term(), p.errFlag
-}
-
-func (p *parser) term() ast.Term {
-	if p.peek().TType == lexer.LAMBDA {
-		p.advance()
-		param := ast.Identifier{p.advance()}
-		p.consume(lexer.DOT, "Expect '.' after function parameter.")
-		body := p.term()
-
-		return ast.Abstraction{param, body}
+// Return the index of an identifer in a slice. Used for De Bruijn Index calculation.
+func contextIndex(obj lexer.Token, slice []string) (int, bool) {
+	for k, v := range slice {
+		if obj.Lexeme == v {
+			return k + 1, true
+		}
 	}
 
-	return p.application()
-}
-
-func (p *parser) application() ast.Term {
-	left, _ := p.atom()
-
-	right, ok := p.atom()
-	for ok {
-		left = ast.Application{left, right}
-		right, ok = p.atom()
-	}
-
-	return left
-}
-
-func (p *parser) atom() (ast.Term, bool) {
-	if p.peek().TType == lexer.LEFT_PAREN {
-		p.advance()
-		term := p.term()
-		p.consume(lexer.RIGHT_PAREN, "Expect closing ')' after term.")
-		return term, true
-	} else if p.peek().TType == lexer.IDENTIFIER {
-		term := ast.Identifier{p.advance()}
-		return term, true
-	}
-
-	return ast.Abstraction{}, false
+	return -1, false
 }

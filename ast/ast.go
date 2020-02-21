@@ -20,7 +20,7 @@ type Term interface {
 }
 
 type Abstraction struct {
-	Param Identifier
+	Param string
 	Body  Term
 }
 
@@ -46,7 +46,8 @@ func (app Application) String() string {
 }
 
 type Identifier struct {
-	Id lexer.Token
+	Id    lexer.Token
+	Index int
 }
 
 func (id Identifier) Accept(v Visitor) interface{} {
@@ -54,5 +55,5 @@ func (id Identifier) Accept(v Visitor) interface{} {
 }
 
 func (id Identifier) String() string {
-	return fmt.Sprintf("{Identifier: Token: %s}", id.Id)
+	return fmt.Sprintf("{Identifier: %s, Index: %v}", id.Id.Lexeme, id.Index)
 }
