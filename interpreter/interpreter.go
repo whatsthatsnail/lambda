@@ -2,7 +2,7 @@ package interpreter
 
 import (
 	"lambda/ast"
-	//"fmt"
+	"fmt"
 )
 
 type interpreter struct{
@@ -18,6 +18,7 @@ func NewInterpreter(tree ast.Term) interpreter {
 func (i interpreter) Evaluate() interface{} {
 	// First, index all free variables by their depth (with no shift offset)
 	result := indexFree(i.tree, 0)
+	fmt.Println(result)
 	
 	return result.Accept(i)
 }
@@ -37,7 +38,7 @@ func (i interpreter) VisitApplication(app ast.Application) interface{} {
 	lValue := app.Left.Accept(i)
 	rValue := app.Right.Accept(i)
 
-	value := substitute(lValue.(ast.Term), rValue.(ast.Term))
+	value := substitute(rValue.(ast.Term), lValue.(ast.Term))
 	return value
 }
 
@@ -168,7 +169,13 @@ func substitute(value ast.Term, node ast.Term) ast.Term {
 	result := node.Accept(substituter).(ast.Term)
 
 	// Re-index free variables and shift them down by one.
-	result = indexFree(result, -1)
+	result = indexFree(result, 0)
 
-	return result
+	// Drop the enclosing abstraction and return the result
+	switch r := result.(type) {
+	case ast.Abstraction:
+		return r.Body
+	default:
+		return result
+	}
 }

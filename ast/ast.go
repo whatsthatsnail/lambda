@@ -29,7 +29,7 @@ func (abs Abstraction) Accept(v Visitor) interface{} {
 }
 
 func (abs Abstraction) String() string {
-	return fmt.Sprintf("Abs: (λ%s. %s)", abs.Param, abs.Body)
+	return fmt.Sprintf("(λ%s. %s)", abs.Param, abs.Body)
 }
 
 type Application struct {
@@ -42,7 +42,7 @@ func (app Application) Accept(v Visitor) interface{} {
 }
 
 func (app Application) String() string {
-	return fmt.Sprintf("App: (%s %s)", app.Left, app.Right)
+	return fmt.Sprintf("(%s %s)", app.Left, app.Right)
 }
 
 type Identifier struct {
@@ -56,9 +56,5 @@ func (id Identifier) Accept(v Visitor) interface{} {
 }
 
 func (id Identifier) String() string {
-	if !id.Free {
-		return fmt.Sprintf("%s", id.Token.Lexeme)
-	} else {
-		return fmt.Sprintf("%s", id.Token.Lexeme)
-	}
+	return fmt.Sprintf("%s", id.Token.Lexeme)
 }

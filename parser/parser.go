@@ -53,7 +53,7 @@ func (p *parser) term() ast.Term {
 }
 
 func (p *parser) application() ast.Term {
-	left := p.application()
+	left, _ := p.atom()
 
 	right, ok := p.atom()
 	for ok {
