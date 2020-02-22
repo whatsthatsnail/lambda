@@ -11,7 +11,6 @@ import (
 type parser struct {
 	tokens      []lexer.Token
 	context     []string
-	lambdaDepth int
 	current     int
 	errFlag     bool
 }
@@ -30,20 +29,12 @@ func NewParser(tokens []lexer.Token) parser {
 func (p *parser) Parse() (ast.Term, bool) {
 	ast, err := p.term(), p.errFlag
 
-	for k, v := range p.context {
-		fmt.Printf("%v: %s\n", k, v)
-	}
-
 	return ast, err
 }
 
 func (p *parser) term() ast.Term {
 	if p.peek().TType == lexer.LAMBDA {
 		p.advance()
-
-		// Increment lambda depth when beginning a new function.
-		// This is used later for free variable indexes.
-		p.lambdaDepth++
 
 		// Creating a new identifier places it at the end of the context stack.
 		param := p.advance().Lexeme
@@ -54,9 +45,6 @@ func (p *parser) term() ast.Term {
 		p.consume(lexer.DOT, "Expect '.' after function parameter.")
 		body := p.term()
 
-		// Reset depth.
-		p.lambdaDepth = 0
-
 		// Return the abstraction.
 		return ast.Abstraction{param, body}
 	}
@@ -65,7 +53,7 @@ func (p *parser) term() ast.Term {
 }
 
 func (p *parser) application() ast.Term {
-	left, _ := p.atom()
+	left := p.application()
 
 	right, ok := p.atom()
 	for ok {
@@ -89,16 +77,14 @@ func (p *parser) atom() (ast.Term, bool) {
 
 		if ok {
 			// Attach the identifier's distance from it's declaration in the context stack
-			term := ast.Identifier{p.advance(), len(p.context) - index}
+			term := ast.Identifier{p.advance(), len(p.context) - index, false}
 			return term, true
 		} else {
 			// If it's not in the context stack, it's a free variables.
 			// Free variables wrapped in n lambdas are given index n (using p.lamdaDepth)
-			term := ast.Identifier{p.advance(), p.lambdaDepth}
+			term := ast.Identifier{p.advance(), -1, true}
 
-			//TODO: Is this necessary?
-			// Free variables need to be pushed to the context stack?
-			p.context = append(p.context, term.Id.Lexeme)
+			// Do not push free variables to the context stack? Sure.
 
 			return term, true
 		}
@@ -109,6 +95,7 @@ func (p *parser) atom() (ast.Term, bool) {
 }
 
 // ---------- Helper methods: ---------- //
+
 // Return current token without advancing.
 func (p *parser) peek() lexer.Token {
 	return p.tokens[p.current]

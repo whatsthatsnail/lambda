@@ -1,9 +1,0 @@
-# Pure lambda caclulus:
-
-term = application
-     | LAMBDA IDENTIFIER "." term ;
-
-application = atom (application)* ;
-
-atom = "(" term ")"
-     | IDENTIFIER ;

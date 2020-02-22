@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"lambda/lexer"
 	"lambda/parser"
+	"lambda/interpreter"
 	"os"
 )
 
@@ -59,18 +60,18 @@ func file(path string, quiet bool) {
 	dat, err := ioutil.ReadFile(path)
 	check(err)
 
-	if !quiet {
-		fmt.Println(path + ":" + "\n")
-		fmt.Println(string(dat) + "\n")
-	}
-
 	lex := lexer.NewLexer(string(dat), false)
 	tokens, _ := lex.ScanTokens()
 
-	lexer.PrintTokens(tokens)
+	if !quiet {
+		fmt.Println(path + ":" + "\n")
+		fmt.Println(string(dat) + "\n")
+		lexer.PrintTokens(tokens)
+	}
 
 	parser := parser.NewParser(tokens)
 	tree, _ := parser.Parse()
 
-	fmt.Println(tree)
+	inter := interpreter.NewInterpreter(tree)
+	fmt.Println(inter.Evaluate())
 }

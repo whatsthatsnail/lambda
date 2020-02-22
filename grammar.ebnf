@@ -1,0 +1,7 @@
+(* Pure lambda caclulus: *)
+
+expr        = lambda | application | variable | parens ;
+lambda      = "\" variable "." expr ;
+application = expr expr ;
+variable    = IDENTIFIER ;
+parens      = "(" expr ")" ;
