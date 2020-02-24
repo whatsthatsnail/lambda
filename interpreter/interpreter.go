@@ -36,26 +36,29 @@ func (i interpreter) VisitAbstraction(abs ast.Abstraction) interface{} {
 func (i interpreter) VisitApplication(app ast.Application) interface{} {
 	lValue := app.Left.Accept(i)
 	rValue := app.Right.Accept(i)
+	value := ast.Application{lValue.(ast.Term), rValue.(ast.Term)}
 
-	// Alpha conversion to resolve duplicate variables
-	alpha := &alpha{}
-	value := ast.Application{rValue.(ast.Term), lValue.(ast.Term)}
-	value = alpha.conv(value)
+	// If the expression can be evaluated further, begin evaluating.
+	isValue := isValue{}
+	if !value.Accept(isValue).(bool) {
+		// Alpha conversion to resolve duplicate variables
+		alpha := &alpha{}
+		value = alpha.conv(value)
 
-	// Beta reduction to evaluate the application
-	parameter := value.Left.Accept(i)
-	switch v := parameter.(type) {
-	case ast.Identifier:
-		return v
-	case ast.Abstraction:
-		beta := &beta{v.Param.(ast.Identifier).Name, value.Right}
-		result := value.Accept(beta)
-		return result
-	case ast.Application:
-		return v.Accept(i)
+		// Beta reduction to evaluate the application
+		switch v := value.Left.(type) {
+		case ast.Identifier:
+			return ast.Application{v, value.Right}
+		case ast.Abstraction:
+			beta := &beta{v.Param.(ast.Identifier).Name, value.Right}
+			result := v.Body.Accept(beta)
+			return result
+		case ast.Application:
+			return v.Accept(i)
+		}
 	}
 
-	return nil
+	return value
 }
 
 func (i interpreter) VisitIdentifier(id ast.Identifier) interface{} {
@@ -136,4 +139,36 @@ func (b *beta) VisitIdentifier(id ast.Identifier) interface{} {
 	}
 
 	return id
+}
+
+// ---------- isValue visitor ---------- //
+
+// Returns true if the expression is a value and cannot be evaluated further.
+type isValue struct {}
+
+func (v isValue) VisitAbstraction(abs ast.Abstraction) interface{} {
+	return abs.Body.Accept(v)
+}
+
+func (v isValue) VisitApplication(app ast.Application) interface{} {
+	var left bool
+	switch l := app.Left.(type) {
+	case ast.Identifier:
+		left = true
+	case ast.Abstraction:
+		left = false
+	case ast.Application:
+		left = l.Accept(v).(bool)
+	}
+	right := app.Right.Accept(v).(bool)
+
+	if (left && right) {
+		return true
+	}
+	
+	return false
+}
+
+func (v isValue) VisitIdentifier(id ast.Identifier) interface{} {
+	return true
 }

@@ -161,6 +161,12 @@ func (l *lexer) scanToken() {
 	case ')':
 		l.addToken(RIGHT_PAREN, nil)
 
+	// Line comment
+	case '#':
+		for l.peek() != '\n' {
+			l.advance()
+		}
+
 	// Skip over whitespace
 	case ' ':
 	case '\r':

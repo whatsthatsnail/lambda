@@ -61,7 +61,7 @@ func file(path string, quiet bool) {
 	check(err)
 
 	lex := lexer.NewLexer(string(dat), false)
-	tokens, _ := lex.ScanTokens()
+	tokens, lexErr := lex.ScanTokens()
 
 	if !quiet {
 		fmt.Println(path + ":" + "\n")
@@ -69,9 +69,13 @@ func file(path string, quiet bool) {
 		lexer.PrintTokens(tokens)
 	}
 
-	parser := parser.NewParser(tokens)
-	tree, _ := parser.Parse()
+	if !lexErr {
+		parser := parser.NewParser(tokens)
+		tree, parErr := parser.Parse()
 
-	inter := interpreter.NewInterpreter(tree)
-	fmt.Println(inter.Evaluate())
+		if !parErr {
+			inter := interpreter.NewInterpreter(tree)
+			fmt.Println(inter.Evaluate())
+		}
+	}
 }

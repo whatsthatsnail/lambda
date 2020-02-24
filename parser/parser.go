@@ -28,6 +28,10 @@ func NewParser(tokens []lexer.Token) parser {
 func (p *parser) Parse() (ast.Term, bool) {
 	ast, err := p.term(), p.errFlag
 
+	if p.tokens[0].TType == lexer.EOF {
+		err = true
+	}
+
 	return ast, err
 }
 
