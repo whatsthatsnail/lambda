@@ -9,10 +9,9 @@ import (
 // ---------- Parser type: ---------- //
 
 type parser struct {
-	tokens      []lexer.Token
-	context     []string
-	current     int
-	errFlag     bool
+	tokens  []lexer.Token
+	current int
+	errFlag bool
 }
 
 // Parser constructor, initializes default vaules
@@ -36,11 +35,7 @@ func (p *parser) term() ast.Term {
 	if p.peek().TType == lexer.LAMBDA {
 		p.advance()
 
-		// Creating a new identifier places it at the end of the context stack.
-		param := p.advance().Lexeme
-
-		// Push the identifier onto the context stack.
-		p.context = append(p.context, param)
+		param, _ := p.atom()
 
 		p.consume(lexer.DOT, "Expect '.' after function parameter.")
 		body := p.term()
@@ -71,24 +66,8 @@ func (p *parser) atom() (ast.Term, bool) {
 		p.consume(lexer.RIGHT_PAREN, "Expect closing ')' after term.")
 		return term, true
 	} else if p.peek().TType == lexer.IDENTIFIER {
-
-		// Lookup the identifier in the context stack. Attach it's De Bruijn index to the object.
-		index, ok := contextIndex(p.peek(), p.context)
-
-		if ok {
-			// Attach the identifier's distance from it's declaration in the context stack
-			term := ast.Identifier{p.advance(), len(p.context) - index, false}
-			return term, true
-		} else {
-			// If it's not in the context stack, it's a free variables.
-			// Free variables wrapped in n lambdas are given index n (using p.lamdaDepth)
-			term := ast.Identifier{p.advance(), -1, true}
-
-			// Do not push free variables to the context stack? Sure.
-
-			return term, true
-		}
-
+		term := ast.Identifier{p.advance().Lexeme}
+		return term, true
 	}
 
 	return ast.Abstraction{}, false
@@ -143,15 +122,4 @@ func (p *parser) consume(tType lexer.TokenType, message string) {
 func (p *parser) parseError(token lexer.Token, message string) {
 	p.errFlag = true
 	fmt.Printf("[Line: %v] %s\n", token.Line, fmt.Sprintf("%v -- %s", p.peek().Lexeme, message))
-}
-
-// Return the index of an identifer in a slice. Used for De Bruijn Index calculation.
-func contextIndex(obj lexer.Token, slice []string) (int, bool) {
-	for k, v := range slice {
-		if obj.Lexeme == v {
-			return k + 1, true
-		}
-	}
-
-	return -1, false
 }

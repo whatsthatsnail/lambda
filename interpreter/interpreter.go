@@ -1,11 +1,11 @@
 package interpreter
 
 import (
-	"lambda/ast"
 	"fmt"
+	"lambda/ast"
 )
 
-type interpreter struct{
+type interpreter struct {
 	tree ast.Term
 }
 
@@ -17,17 +17,16 @@ func NewInterpreter(tree ast.Term) interpreter {
 
 func (i interpreter) Evaluate() interface{} {
 	// First, index all free variables by their depth (with no shift offset)
-	result := indexFree(i.tree, 0)
-	fmt.Println(result)
-	
-	return result.Accept(i)
+	fmt.Println(i.tree)
+
+	return i.tree.Accept(i)
 }
 
-// ---------- Visit methods: ---------- //
+// ---------- Interpreter visit methods: ---------- //
 
 func (i interpreter) VisitAbstraction(abs ast.Abstraction) interface{} {
 	// Evaluate both the parameter and body.
-	pValue := abs.Param
+	pValue := abs.Param.Accept(i).(ast.Term)
 	bValue := abs.Body.Accept(i).(ast.Term)
 
 	// Return an abstraction with it's terms evaluated to values.
@@ -38,8 +37,25 @@ func (i interpreter) VisitApplication(app ast.Application) interface{} {
 	lValue := app.Left.Accept(i)
 	rValue := app.Right.Accept(i)
 
-	value := substitute(rValue.(ast.Term), lValue.(ast.Term))
-	return value
+	// Alpha conversion to resolve duplicate variables
+	alpha := &alpha{}
+	value := ast.Application{rValue.(ast.Term), lValue.(ast.Term)}
+	value = alpha.conv(value)
+
+	// Beta reduction to evaluate the application
+	parameter := value.Left.Accept(i)
+	switch v := parameter.(type) {
+	case ast.Identifier:
+		return v
+	case ast.Abstraction:
+		beta := &beta{v.Param.(ast.Identifier).Name, value.Right}
+		result := value.Accept(beta)
+		return result
+	case ast.Application:
+		return v.Accept(i)
+	}
+
+	return nil
 }
 
 func (i interpreter) VisitIdentifier(id ast.Identifier) interface{} {
@@ -47,135 +63,77 @@ func (i interpreter) VisitIdentifier(id ast.Identifier) interface{} {
 	return id
 }
 
-// ---------- Helper methods: ---------- //
+// ---------- Alpha Conversion Visitor: ---------- //
 
-// Do we even need this?
-func isValue(term ast.Term) bool {
-	switch term.(type) {
-
-	// Identifiers are values
-	case ast.Identifier:
-		return true
-
-	// Abstractions with only identifiers in the parameter and body are values
-	case ast.Abstraction:
-		return isValue(term.(ast.Abstraction).Body)
-
-	default:
-		return false
-	}
+type alpha struct {
+	variables []ast.Identifier
+	left      bool
 }
 
-// Shifter visitor shifts free variables' indexes by x.
-type shifter struct{
-	x int
-	tree ast.Term
+func (a *alpha) VisitAbstraction(abs ast.Abstraction) interface{} {
+	pValue := abs.Param.Accept(a).(ast.Term)
+	bValue := abs.Body.Accept(a).(ast.Term)
+
+	return ast.Abstraction{pValue, bValue}
 }
 
-func (s shifter) VisitAbstraction(abs ast.Abstraction) interface{} {
-	return ast.Abstraction{abs.Param, abs.Body.Accept(s).(ast.Term)}
-}
-
-func (s shifter) VisitApplication(app ast.Application) interface{} {
-	left := app.Left.Accept(s).(ast.Term)
-	right := app.Right.Accept(s).(ast.Term)
-
+func (a *alpha) VisitApplication(app ast.Application) interface{} {
+	left := app.Left.Accept(a).(ast.Term)
+	right := app.Right.Accept(a).(ast.Term)
 	return ast.Application{left, right}
 }
 
-func (s shifter) VisitIdentifier(id ast.Identifier) interface{} {
-	if id.Free {
-		return ast.Identifier{id.Token, id.Index + s.x, id.Free}
-	} else {
+func (a *alpha) VisitIdentifier(id ast.Identifier) interface{} {
+	if a.left {
+		a.variables = append(a.variables, id)
 		return id
 	}
-}
 
-// Use the shifter visitor to shift all free variables in an AST by 'x'.
-func shift(node ast.Term, x int) ast.Term {
-	shifter := shifter{x, node}
-	return node.Accept(shifter).(ast.Term)
-}
-
-// Find the abstraction depth of a given identifier.
-type indexer struct {
-	depth int
-	shift int
-}
-
-func (i *indexer) VisitAbstraction(abs ast.Abstraction) interface{} {
-	// Increase depth when entering abstraction.
-	i.depth++
-
-	body := abs.Body.Accept(i).(ast.Term)
-
-	// Decrease depth when ending abstraction.
-	i.depth--
-
-	return ast.Abstraction{abs.Param, body}
-}
-
-func (i *indexer) VisitApplication(app ast.Application) interface{} {
-	left := app.Left.Accept(i).(ast.Term)
-	right := app.Right.Accept(i).(ast.Term)
-	return ast.Application{left, right}
-}
-
-func (i *indexer) VisitIdentifier(id ast.Identifier) interface{} {
-	if id.Free {
-		id.Index = i.depth + i.shift
+	for _, k := range a.variables {
+		if k.Name == id.Name {
+			id.Name = fmt.Sprintf("%s%s", id.Name, "'")
+			return id
+		}
 	}
+
 	return id
 }
 
-// Use the indexer visitor to index all free variables based on their abstraction depth.
-func indexFree(node ast.Term, shift int) ast.Term {
-	indexer := &indexer{0, shift}
-	result := node.Accept(indexer)
-	return result.(ast.Term)
+func (a *alpha) conv(app ast.Application) ast.Application {
+	// The left flag sets the visitor to "append mode" and only appends variables.
+	a.left = true
+	lValue := app.Left.Accept(a)
+
+	// With the left flag false, the visitor actually converts duplicate variables.
+	a.left = false
+	rValue := app.Right.Accept(a)
+
+	return ast.Application{lValue.(ast.Term), rValue.(ast.Term)}
 }
 
-type substituter struct {
-	value ast.Term
+// ---------- Beta Reduction Visitor: ---------- //
+type beta struct {
+	parameter string
+	value     ast.Term
 }
 
-func (s substituter) VisitAbstraction(abs ast.Abstraction) interface{} {
-	return ast.Abstraction{abs.Param, abs.Body.Accept(s).(ast.Term)}
+func (b *beta) VisitAbstraction(abs ast.Abstraction) interface{} {
+	pValue := abs.Param.Accept(b).(ast.Term)
+	bValue := abs.Body.Accept(b).(ast.Term)
+
+	return ast.Abstraction{pValue, bValue}
 }
 
-func (s substituter) VisitApplication(app ast.Application) interface{} {
-	left := app.Left.Accept(s).(ast.Term)
-	right := app.Right.Accept(s).(ast.Term)
+func (b *beta) VisitApplication(app ast.Application) interface{} {
+	left := app.Left.Accept(b).(ast.Term)
+	right := app.Right.Accept(b).(ast.Term)
 	return ast.Application{left, right}
 }
 
-func (s substituter) VisitIdentifier(id ast.Identifier) interface{} {
-	if id.Index == 0 {
-		return s.value
-	} else {
-		return id
+func (b *beta) VisitIdentifier(id ast.Identifier) interface{} {
+	if id.Name == b.parameter {
+		return b.value
 	}
-}
 
-
-// Substitute all variables in 'node' that have a De Bruijn index of zero by 'value'.
-// Substitute is defined as the shifted down result of replacing all occurrences of x in node with value shifted up
-func substitute(value ast.Term, node ast.Term) ast.Term {
-	// First, shift up the value.
-	value = shift(value, 1)
-	
-	// Replace all variables with index 0 with the new value.
-	substituter := substituter{value}
-	result := node.Accept(substituter).(ast.Term)
-
-	// Re-index free variables and shift them down by one.
-	result = indexFree(result, 0)
-
-	// Drop the enclosing abstraction and return the result
-	switch r := result.(type) {
-	case ast.Abstraction:
-		return r.Body
-	default:
-		return result
-	}
+	return id
 }

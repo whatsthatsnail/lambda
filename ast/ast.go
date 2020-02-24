@@ -2,7 +2,6 @@ package ast
 
 import (
 	"fmt"
-	"lambda/lexer"
 )
 
 // ---------- Visitor interface: --------- //
@@ -20,7 +19,7 @@ type Term interface {
 }
 
 type Abstraction struct {
-	Param string
+	Param Term
 	Body  Term
 }
 
@@ -46,9 +45,7 @@ func (app Application) String() string {
 }
 
 type Identifier struct {
-	Token    lexer.Token
-	Index int
-	Free bool
+	Name string
 }
 
 func (id Identifier) Accept(v Visitor) interface{} {
@@ -56,5 +53,5 @@ func (id Identifier) Accept(v Visitor) interface{} {
 }
 
 func (id Identifier) String() string {
-	return fmt.Sprintf("%s", id.Token.Lexeme)
+	return id.Name
 }
