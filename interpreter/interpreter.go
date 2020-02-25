@@ -36,29 +36,17 @@ func (i interpreter) VisitAbstraction(abs ast.Abstraction) interface{} {
 func (i interpreter) VisitApplication(app ast.Application) interface{} {
 	lValue := app.Left.Accept(i)
 	rValue := app.Right.Accept(i)
-	value := ast.Application{lValue.(ast.Term), rValue.(ast.Term)}
+	expr := ast.Application{lValue.(ast.Term), rValue.(ast.Term)}
 
 	// If the expression can be evaluated further, begin evaluating.
-	isValue := isValue{}
-	if !value.Accept(isValue).(bool) {
-		// Alpha conversion to resolve duplicate variables
-		alpha := &alpha{}
-		value = alpha.conv(value)
+	result := i.substitute(expr.Left, expr.Right)
 
-		// Beta reduction to evaluate the application
-		switch v := value.Left.(type) {
-		case ast.Identifier:
-			return ast.Application{v, value.Right}
-		case ast.Abstraction:
-			beta := &beta{v.Param.(ast.Identifier).Name, value.Right}
-			result := v.Body.Accept(beta)
-			return result
-		case ast.Application:
-			return v.Accept(i)
-		}
+	// Values evaluate to themselves, so only continue evaluating non-values
+	if result != alpha(expr) {
+		return result.(ast.Term).Accept(i)
 	}
 
-	return value
+	return expr
 }
 
 func (i interpreter) VisitIdentifier(id ast.Identifier) interface{} {
@@ -66,27 +54,46 @@ func (i interpreter) VisitIdentifier(id ast.Identifier) interface{} {
 	return id
 }
 
+func (i interpreter) substitute(left ast.Term, right ast.Term) interface{} {
+	// Alpha conversion to resolve duplicate variables
+	alphaExpr := alpha(ast.Application{left, right})
+
+	// Beta reduction to evaluate the application
+	switch left := alphaExpr.Left.(type) {
+	case ast.Identifier:
+		return ast.Application{left, alphaExpr.Right}
+	case ast.Abstraction:
+		beta := &beta{left.Param.(ast.Identifier).Name, alphaExpr.Right}
+		betaExpr := left.Body.Accept(beta).(ast.Term)
+		return betaExpr.Accept(i)
+	case ast.Application:
+		return ast.Application{left.Accept(i).(ast.Term), alphaExpr.Right}
+	}
+
+	return nil
+}
+
 // ---------- Alpha Conversion Visitor: ---------- //
 
-type alpha struct {
+type alphaVisitor struct {
 	variables []ast.Identifier
 	left      bool
 }
 
-func (a *alpha) VisitAbstraction(abs ast.Abstraction) interface{} {
+func (a *alphaVisitor) VisitAbstraction(abs ast.Abstraction) interface{} {
 	pValue := abs.Param.Accept(a).(ast.Term)
 	bValue := abs.Body.Accept(a).(ast.Term)
 
 	return ast.Abstraction{pValue, bValue}
 }
 
-func (a *alpha) VisitApplication(app ast.Application) interface{} {
+func (a *alphaVisitor) VisitApplication(app ast.Application) interface{} {
 	left := app.Left.Accept(a).(ast.Term)
 	right := app.Right.Accept(a).(ast.Term)
 	return ast.Application{left, right}
 }
 
-func (a *alpha) VisitIdentifier(id ast.Identifier) interface{} {
+func (a *alphaVisitor) VisitIdentifier(id ast.Identifier) interface{} {
 	if a.left {
 		a.variables = append(a.variables, id)
 		return id
@@ -102,7 +109,9 @@ func (a *alpha) VisitIdentifier(id ast.Identifier) interface{} {
 	return id
 }
 
-func (a *alpha) conv(app ast.Application) ast.Application {
+func alpha(app ast.Application) ast.Application {
+	a := &alphaVisitor{}
+
 	// The left flag sets the visitor to "append mode" and only appends variables.
 	a.left = true
 	lValue := app.Left.Accept(a)
@@ -139,36 +148,4 @@ func (b *beta) VisitIdentifier(id ast.Identifier) interface{} {
 	}
 
 	return id
-}
-
-// ---------- isValue visitor ---------- //
-
-// Returns true if the expression is a value and cannot be evaluated further.
-type isValue struct {}
-
-func (v isValue) VisitAbstraction(abs ast.Abstraction) interface{} {
-	return abs.Body.Accept(v)
-}
-
-func (v isValue) VisitApplication(app ast.Application) interface{} {
-	var left bool
-	switch l := app.Left.(type) {
-	case ast.Identifier:
-		left = true
-	case ast.Abstraction:
-		left = false
-	case ast.Application:
-		left = l.Accept(v).(bool)
-	}
-	right := app.Right.Accept(v).(bool)
-
-	if (left && right) {
-		return true
-	}
-	
-	return false
-}
-
-func (v isValue) VisitIdentifier(id ast.Identifier) interface{} {
-	return true
 }

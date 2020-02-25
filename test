@@ -18,14 +18,14 @@
 # (((\ x. (\ y. y)) (\ a. a)) (\ b. b))
 ### (\ b. b)
 
-# ((\x. (x x)) (\x. (x x)))
+#! ((\x. (x x)) (\x. (x x)))
 ### anything (This is an example of an expression that has no normal form)
 
-# (((\ x. (\ y. x)) (\ a. a)) ((\x. (x x)) (\x. (x x))))
-### (\ a. a) (This is an example of an expression which does not normalize if you evaluate the arguments before the function call, and sadly an example for which my attempted solution fails)
+#! (((\ x. (\ y. x)) (\ a. a)) ((\x. (x x)) (\x. (x x))))
+### (\ a. a) (This is an example of an expression which does not normalize if you evaluate the arguments before the function call)
 
-## This one doesn't work
-# ((\ a. (\ b. (a (a (a b))))) (\ c. (\ d. (c (c d)))))
+#((\ a. (\ b. (a (a (a b))))) (\ c. (\ d. (c (c d)))))
 ### (\ a. (\ b. (a (a (a (a (a (a (a (a b))))))))))
 
-((\x. x) (\y.y)) (\z. z)
+# x x x
+### x x x
