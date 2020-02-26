@@ -4,11 +4,16 @@ import (
 	"fmt"
 )
 
-// ---------- Helper Functions: ---------- //
+// ---------- Helper functions: ---------- //
 
-// Return underscore as alpha to allow '_' in idenifiers and keywords
-func isAlpha(r rune) bool {
-	return (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r == '_')
+// Determines if a character is valid as an identifier character.
+func isValidChar(char rune) bool {
+	switch char {
+	case '\\', '.', '(', ')', '=', '\n':
+		return false
+	}
+
+	return true
 }
 
 // ---------- TokenType type: ---------- //
@@ -21,10 +26,15 @@ const (
 	DOT
 	LEFT_PAREN
 	RIGHT_PAREN
+	EQUAL
+
+	// Keywords
+	LET
 
 	// Literals
 	IDENTIFIER
 
+	NEWLINE
 	EOF
 )
 
@@ -40,8 +50,14 @@ func (t TokenType) typeString() string {
 	case 3:
 		return "RIGHT_PAREN"
 	case 4:
-		return "IDENTIFIER"
+		return "EQUAL"
 	case 5:
+		return "LET"
+	case 6:
+		return "IDENTIFIER"
+	case 7:
+		return "NEWLINE"
+	case 8:
 		return "EOF"
 	}
 
@@ -134,16 +150,21 @@ func (l *lexer) addToken(tType TokenType, literal interface{}) {
 	}
 }
 
-func (l *lexer) getIdentifier() {
-	// Advance to en of word
-	for isAlpha(l.peek()) && !l.isAtEnd() {
+func (l *lexer) getWord() {
+	// Advance to end of word
+	for isValidChar(l.peek()) && l.peek() != ' ' && !l.isAtEnd() {
 		l.advance()
 	}
 
 	// Store word lexeme
 	word := l.source[l.start:l.current]
 
-	l.addToken(IDENTIFIER, word)
+	switch word {
+	case "let":
+		l.addToken(LET, word)
+	default:
+		l.addToken(IDENTIFIER, word)
+	}
 }
 
 func (l *lexer) scanToken() {
@@ -160,6 +181,8 @@ func (l *lexer) scanToken() {
 		l.addToken(LEFT_PAREN, nil)
 	case ')':
 		l.addToken(RIGHT_PAREN, nil)
+	case '=':
+		l.addToken(EQUAL, nil)
 
 	// Line comment
 	case '#':
@@ -172,14 +195,15 @@ func (l *lexer) scanToken() {
 	case '\r':
 	case '\t':
 	case '\n':
+		if len(l.tokens) > 0 {
+			if l.tokens[len(l.tokens)-1].TType != NEWLINE {
+				l.tokens = append(l.tokens, Token{NEWLINE, "NEWLINE", nil, l.line})
+			}
+		}
 
 	// Multi-character tokens
 	default:
-		if isAlpha(char) {
-			l.addToken(IDENTIFIER, char)
-		} else {
-			l.throwError(fmt.Sprintf("Invalid character '%c'", char))
-		}
+		l.getWord()
 	}
 }
 
@@ -190,6 +214,8 @@ func (l *lexer) ScanTokens() ([]Token, bool) {
 		l.scanToken()
 	}
 
+	l.tokens = append(l.tokens, Token{NEWLINE, "NEWLINE", nil, l.line})
 	l.tokens = append(l.tokens, Token{EOF, "EOF", nil, l.line})
+
 	return l.tokens, l.hadError
 }

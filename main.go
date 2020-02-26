@@ -4,9 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"io/ioutil"
+	"lambda/interpreter"
 	"lambda/lexer"
 	"lambda/parser"
-	"lambda/interpreter"
 	"os"
 )
 
@@ -71,10 +71,10 @@ func file(path string, quiet bool) {
 
 	if !lexErr {
 		parser := parser.NewParser(tokens)
-		tree, parErr := parser.Parse()
+		stmts, parErr := parser.Parse()
 
 		if !parErr {
-			inter := interpreter.NewInterpreter(tree)
+			inter := interpreter.NewInterpreter(stmts)
 			fmt.Println(inter.Evaluate())
 		}
 	}

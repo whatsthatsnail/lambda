@@ -7,12 +7,31 @@ import (
 // ---------- Visitor interface: --------- //
 
 type Visitor interface {
+	VisitDefinition(def Definition) interface{}
+
 	VisitAbstraction(abs Abstraction) interface{}
 	VisitApplication(app Application) interface{}
 	VisitIdentifier(id Identifier) interface{}
 }
 
 // ---------- Node types: --------- //
+
+type Statement interface {
+	Accept(v Visitor) interface{}
+}
+
+type Definition struct {
+	Id   Identifier
+	Term Term
+}
+
+func (def Definition) Accept(v Visitor) interface{} {
+	return v.VisitDefinition(def)
+}
+
+func (def Definition) String() string {
+	return fmt.Sprintf("let %s = %s\n", def.Id, def.Term)
+}
 
 type Term interface {
 	Accept(v Visitor) interface{}

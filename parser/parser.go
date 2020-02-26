@@ -9,9 +9,10 @@ import (
 // ---------- Parser type: ---------- //
 
 type parser struct {
-	tokens  []lexer.Token
-	current int
-	errFlag bool
+	tokens     []lexer.Token
+	statements []ast.Statement
+	current    int
+	errFlag    bool
 }
 
 // Parser constructor, initializes default vaules
@@ -25,14 +26,42 @@ func NewParser(tokens []lexer.Token) parser {
 
 // ---------- Node creator methods: ---------- //
 
-func (p *parser) Parse() (ast.Term, bool) {
-	ast, err := p.term(), p.errFlag
-
-	if p.tokens[0].TType == lexer.EOF {
-		err = true
+func (p *parser) Parse() ([]ast.Statement, bool) {
+	for !p.isAtEnd() {
+		p.statements = append(p.statements, p.statement())
 	}
 
-	return ast, err
+	if p.tokens[0].TType == lexer.EOF {
+		p.errFlag = true
+	}
+
+	return p.statements, p.errFlag
+}
+
+func (p *parser) statement() ast.Statement {
+	var stmt interface{}
+
+	switch p.peek().TType {
+	case lexer.LET:
+		p.advance()
+		stmt = p.definition()
+	default:
+		stmt = p.term()
+	}
+
+	p.consume(lexer.NEWLINE, "Expect newline after statment.")
+
+	return stmt.(ast.Statement)
+}
+
+func (p *parser) definition() ast.Statement {
+	id := ast.Identifier{p.advance().Lexeme}
+
+	p.consume(lexer.EQUAL, "Expect '=' after definition identifier.")
+
+	term := p.term()
+
+	return ast.Definition{id, term}
 }
 
 func (p *parser) term() ast.Term {
@@ -70,8 +99,12 @@ func (p *parser) atom() (ast.Term, bool) {
 		p.consume(lexer.RIGHT_PAREN, "Expect closing ')' after term.")
 		return term, true
 	} else if p.peek().TType == lexer.IDENTIFIER {
-		term := ast.Identifier{p.advance().Lexeme}
-		return term, true
+		id := ast.Identifier{p.advance().Lexeme}
+		if p.peek().TType == lexer.EQUAL {
+			p.consume(lexer.EQUAL, "Expect '=' after implicit definition.")
+			return ast.Definition{id, p.term()}, false
+		}
+		return id, true
 	}
 
 	return ast.Abstraction{}, false

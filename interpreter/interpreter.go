@@ -3,26 +3,55 @@ package interpreter
 import (
 	"fmt"
 	"lambda/ast"
+	"lambda/environment"
 )
 
 type interpreter struct {
-	tree ast.Term
+	statements []ast.Statement
+	env        environment.Environment
 }
 
 // Interpreter constructor
-func NewInterpreter(tree ast.Term) interpreter {
-	i := interpreter{tree}
+func NewInterpreter(stmts []ast.Statement) interpreter {
+	i := interpreter{}
+	i.statements = stmts
+	i.env = environment.NewEnvironment()
 	return i
 }
 
 func (i interpreter) Evaluate() interface{} {
-	// First, index all free variables by their depth (with no shift offset)
-	fmt.Println(i.tree)
+	var results []interface{}
 
-	return i.tree.Accept(i)
+	for _, s := range i.statements {
+		result := s.Accept(i)
+
+		term, ok := result.(ast.Term)
+		if ok {
+			def, ok := i.env.Lookup(term)
+			if ok {
+				results = append(results, def)
+			} else {
+				if result != nil {
+					results = append(results, result)
+				}
+			}
+		} else {
+			if result != nil {
+				results = append(results, result)
+			}
+		}
+
+	}
+
+	return results
 }
 
 // ---------- Interpreter visit methods: ---------- //
+
+func (i interpreter) VisitDefinition(def ast.Definition) interface{} {
+	i.env.Define(def.Id.Name, def.Term)
+	return nil
+}
 
 func (i interpreter) VisitAbstraction(abs ast.Abstraction) interface{} {
 	// Evaluate both the parameter and body.
@@ -51,6 +80,13 @@ func (i interpreter) VisitApplication(app ast.Application) interface{} {
 
 func (i interpreter) VisitIdentifier(id ast.Identifier) interface{} {
 	// Identifiers are, by default, values. So they all return itself.
+
+	// Except for identifiers bound to a definition.
+	term, ok := i.env.Get(id.Name)
+	if ok {
+		return term
+	}
+
 	return id
 }
 
@@ -78,6 +114,10 @@ func (i interpreter) substitute(left ast.Term, right ast.Term) interface{} {
 type alphaVisitor struct {
 	variables []ast.Identifier
 	left      bool
+}
+
+func (a *alphaVisitor) VisitDefinition(def ast.Definition) interface{} {
+	return nil
 }
 
 func (a *alphaVisitor) VisitAbstraction(abs ast.Abstraction) interface{} {
@@ -127,6 +167,10 @@ func alpha(app ast.Application) ast.Application {
 type beta struct {
 	parameter string
 	value     ast.Term
+}
+
+func (b *beta) VisitDefinition(def ast.Definition) interface{} {
+	return nil
 }
 
 func (b *beta) VisitAbstraction(abs ast.Abstraction) interface{} {

@@ -1,0 +1,13 @@
+0 = \f.\x.x
+
+1 = \f.\x.f x
+
+2 = \f.\x.f(f x)
+
+3 = \f.\x.f(f(f x))
+
+S = \n.\f.\x.f((n f) x)
+
+ADD = \a.\b.(a S)b
+
+ADD 1 2

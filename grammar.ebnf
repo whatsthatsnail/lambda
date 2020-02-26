@@ -1,4 +1,8 @@
-(* Pure lambda caclulus: *)
+program     = statement* 'EOF' ;
+
+statement   = (definition | term) NEWLINE ;
+
+definition  = "let" IDENTIFIER "=" term ;
 
 term        = application
             | "\" IDENTIFIER "." term ;
