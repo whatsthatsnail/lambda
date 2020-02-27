@@ -214,7 +214,6 @@ func (l *lexer) ScanTokens() ([]Token, bool) {
 		l.scanToken()
 	}
 
-	l.tokens = append(l.tokens, Token{NEWLINE, "NEWLINE", nil, l.line})
 	l.tokens = append(l.tokens, Token{EOF, "EOF", nil, l.line})
 
 	return l.tokens, l.hadError

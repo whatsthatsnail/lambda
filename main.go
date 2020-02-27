@@ -71,10 +71,10 @@ func file(path string, quiet bool) {
 
 	if !lexErr {
 		parser := parser.NewParser(tokens)
-		stmts, parErr := parser.Parse()
+		defs, expr, parErr := parser.Parse()
 
 		if !parErr {
-			inter := interpreter.NewInterpreter(stmts)
+			inter := interpreter.NewInterpreter(defs, expr)
 			fmt.Println(inter.Evaluate())
 		}
 	}

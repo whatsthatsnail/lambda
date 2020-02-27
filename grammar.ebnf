@@ -1,6 +1,4 @@
-program     = statement* 'EOF' ;
-
-statement   = (definition | term) NEWLINE ;
+program     = (definition NEWLINE)* term 'EOF' ;
 
 definition  = "let" IDENTIFIER "=" term ;
 

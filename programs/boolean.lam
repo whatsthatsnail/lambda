@@ -1,0 +1,12 @@
+true = \x. \y. x
+false = \x. \y. y
+and = \p. \q. p q p
+or = \p. \q. p p q
+if = \p. \x. \y. p x y
+ifAlt = \p. p
+not = \p. p false true
+notAlt = \p. \x. \y. p y x
+
+a = false
+
+a false true

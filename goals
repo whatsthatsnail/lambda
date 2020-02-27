@@ -1,7 +1,7 @@
-1. Working lambda calculus evaluator (almost complete)
+1. Working lambda calculus evaluator (Almost done)
 2. Syntactic sugar for currying
-3. Definitions and statements
+3. Definitions (Done)
     - Definitions place a function in the environment.
     - Definition calls evaluate to the function they are defined as.
-    - Every line of the program is a statement: either a definition or expression.
+    - Program is a list of definitions followed by a final expression.
 4. Sugared numbers and operators

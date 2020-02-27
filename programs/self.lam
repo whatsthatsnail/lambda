@@ -1,0 +1,6 @@
+Var=\x.\i.x
+App=\m. \n.\i.i(i m i)(i n i)
+Lam=\f.\i.\x.f x i
+E=\q.q(\x.x)  # A self-interpreter.
+
+E App (Lam (\y.Var)) (Var x)
