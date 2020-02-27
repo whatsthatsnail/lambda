@@ -2,7 +2,7 @@
 
 1 = \f.\x.f x
 
-2 = \f.\x.f(f x)
+let 2 = \f.\x.f(f x)
 
 3 = \f.\x.f(f(f x))
 

@@ -9,10 +9,11 @@ import (
 // ---------- Parser type: ---------- //
 
 type parser struct {
-	tokens     []lexer.Token
-	statements []ast.Statement
-	current    int
-	errFlag    bool
+	tokens      []lexer.Token
+	definitions []ast.Definition
+	expression  ast.Term
+	current     int
+	errFlag     bool
 }
 
 // Parser constructor, initializes default vaules
@@ -26,35 +27,36 @@ func NewParser(tokens []lexer.Token) parser {
 
 // ---------- Node creator methods: ---------- //
 
-func (p *parser) Parse() ([]ast.Statement, bool) {
+func (p *parser) Parse() ([]ast.Definition, ast.Term, bool) {
+	// Create any explicit or implicit definitions.
 	for !p.isAtEnd() {
-		p.statements = append(p.statements, p.statement())
+		switch p.peek().TType {
+
+		// Explicit let
+		case lexer.LET:
+			p.advance()
+			p.definitions = append(p.definitions, p.definition())
+			p.consume(lexer.NEWLINE, "Expect newline after definition.")
+
+		// Implicity let or final expression
+		default:
+			expr := p.term()
+			def, ok := expr.(ast.Definition)
+			if ok {
+				p.definitions = append(p.definitions, def)
+				p.consume(lexer.NEWLINE, "Expect newline after definition.")
+			} else {
+				p.expression = expr
+				return p.definitions, p.expression, p.errFlag
+			}
+		}
 	}
 
-	if p.tokens[0].TType == lexer.EOF {
-		p.errFlag = true
-	}
-
-	return p.statements, p.errFlag
+	// Return an error if there is no final expression.
+	return p.definitions, p.expression, true
 }
 
-func (p *parser) statement() ast.Statement {
-	var stmt interface{}
-
-	switch p.peek().TType {
-	case lexer.LET:
-		p.advance()
-		stmt = p.definition()
-	default:
-		stmt = p.term()
-	}
-
-	p.consume(lexer.NEWLINE, "Expect newline after statment.")
-
-	return stmt.(ast.Statement)
-}
-
-func (p *parser) definition() ast.Statement {
+func (p *parser) definition() ast.Definition {
 	id := ast.Identifier{p.advance().Lexeme}
 
 	p.consume(lexer.EQUAL, "Expect '=' after definition identifier.")

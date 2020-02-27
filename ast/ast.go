@@ -16,10 +16,6 @@ type Visitor interface {
 
 // ---------- Node types: --------- //
 
-type Statement interface {
-	Accept(v Visitor) interface{}
-}
-
 type Definition struct {
 	Id   Identifier
 	Term Term

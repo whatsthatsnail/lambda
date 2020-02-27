@@ -7,43 +7,40 @@ import (
 )
 
 type interpreter struct {
-	statements []ast.Statement
-	env        environment.Environment
+	definitions []ast.Definition
+	expression  ast.Term
+	env         environment.Environment
 }
 
 // Interpreter constructor
-func NewInterpreter(stmts []ast.Statement) interpreter {
+func NewInterpreter(defs []ast.Definition, expr ast.Term) interpreter {
 	i := interpreter{}
-	i.statements = stmts
+	i.definitions = defs
+	i.expression = expr
 	i.env = environment.NewEnvironment()
 	return i
 }
 
 func (i interpreter) Evaluate() interface{} {
-	var results []interface{}
 
-	for _, s := range i.statements {
-		result := s.Accept(i)
-
-		term, ok := result.(ast.Term)
-		if ok {
-			def, ok := i.env.Lookup(term)
-			if ok {
-				results = append(results, def)
-			} else {
-				if result != nil {
-					results = append(results, result)
-				}
-			}
-		} else {
-			if result != nil {
-				results = append(results, result)
-			}
-		}
-
+	// Define all definitions
+	for _, def := range i.definitions {
+		def.Accept(i)
 	}
 
-	return results
+	// Evaluate the expression.
+	result := i.expression.Accept(i).(ast.Term)
+
+	// Remove any ' from identifier names.
+	result = reverseAlpha(result)
+
+	// See if the result has a definition in the environment.
+	key, ok := i.env.Lookup(result)
+	if ok {
+		return key
+	}
+
+	return i.expression.Accept(i)
 }
 
 // ---------- Interpreter visit methods: ---------- //
@@ -161,6 +158,43 @@ func alpha(app ast.Application) ast.Application {
 	rValue := app.Right.Accept(a)
 
 	return ast.Application{lValue.(ast.Term), rValue.(ast.Term)}
+}
+
+// ---------- Alpha Reversal Visitor: ---------- //
+
+type alphaReverser struct{}
+
+func (a alphaReverser) VisitDefinition(def ast.Definition) interface{} {
+	return nil
+}
+
+func (a alphaReverser) VisitAbstraction(abs ast.Abstraction) interface{} {
+	pValue := abs.Param.Accept(a).(ast.Term)
+	bValue := abs.Body.Accept(a).(ast.Term)
+
+	return ast.Abstraction{pValue, bValue}
+}
+
+func (a alphaReverser) VisitApplication(app ast.Application) interface{} {
+	left := app.Left.Accept(a).(ast.Term)
+	right := app.Right.Accept(a).(ast.Term)
+	return ast.Application{left, right}
+}
+
+func (a alphaReverser) VisitIdentifier(id ast.Identifier) interface{} {
+	name := id.Name
+	for name[len(name)-1:] == "'" {
+		name = name[:len(name)-1]
+	}
+
+	return ast.Identifier{name}
+}
+
+// Essentially undoes the alpha conversion process.
+func reverseAlpha(term ast.Term) ast.Term {
+	a := alphaReverser{}
+
+	return term.Accept(a).(ast.Term)
 }
 
 // ---------- Beta Reduction Visitor: ---------- //
